@@ -185,5 +185,74 @@ void main() {
       expect(result.errorCount, 1);
       expect(result.infoCount, 0);
     });
+
+    group('filteredBySeverity', () {
+      AuditIssue issueAt(AuditSeverity severity, int line) => AuditIssue(
+        ruleId: 'r',
+        severity: severity,
+        message: 'm',
+        filePath: 'lib/a.dart',
+        range: SourceRange(start: SourceLocation(line: line, column: 1)),
+      );
+
+      AuditResult mixedSeverityResult() => AuditResult(
+        issues: [
+          issueAt(AuditSeverity.info, 1),
+          issueAt(AuditSeverity.warning, 2),
+          issueAt(AuditSeverity.error, 3),
+        ],
+        filesScanned: 5,
+        duration: const Duration(milliseconds: 42),
+        pluginSummaries: const [
+          PluginExecutionSummary(pluginId: 'fake', filesScanned: 5),
+        ],
+      );
+
+      test(
+        'info threshold keeps every issue (matches unfiltered behavior)',
+        () {
+          final filtered = mixedSeverityResult().filteredBySeverity(
+            AuditSeverity.info,
+          );
+
+          expect(filtered.issues, hasLength(3));
+          expect(filtered.infoCount, 1);
+          expect(filtered.warningCount, 1);
+          expect(filtered.errorCount, 1);
+        },
+      );
+
+      test('warning threshold drops info issues only', () {
+        final filtered = mixedSeverityResult().filteredBySeverity(
+          AuditSeverity.warning,
+        );
+
+        expect(filtered.issues, hasLength(2));
+        expect(filtered.infoCount, 0);
+        expect(filtered.warningCount, 1);
+        expect(filtered.errorCount, 1);
+      });
+
+      test('error threshold keeps only error issues', () {
+        final filtered = mixedSeverityResult().filteredBySeverity(
+          AuditSeverity.error,
+        );
+
+        expect(filtered.issues, hasLength(1));
+        expect(filtered.infoCount, 0);
+        expect(filtered.warningCount, 0);
+        expect(filtered.errorCount, 1);
+      });
+
+      test('filesScanned, duration, and pluginSummaries are unaffected', () {
+        final original = mixedSeverityResult();
+        final filtered = original.filteredBySeverity(AuditSeverity.error);
+
+        expect(filtered.filesScanned, original.filesScanned);
+        expect(filtered.duration, original.duration);
+        expect(filtered.pluginSummaries, hasLength(1));
+        expect(filtered.pluginSummaries.single.pluginId, 'fake');
+      });
+    });
   });
 }

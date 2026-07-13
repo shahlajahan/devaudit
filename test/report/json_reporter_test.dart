@@ -65,5 +65,75 @@ void main() {
       final second = reporter.render(_sampleResult(), target: '.');
       expect(first, equals(second));
     });
+
+    group('rendering a result already filtered by minimum severity', () {
+      AuditIssue issueAt(AuditSeverity severity, int line) => AuditIssue(
+        ruleId: 'r',
+        severity: severity,
+        message: 'm',
+        filePath: 'lib/a.dart',
+        range: SourceRange(start: SourceLocation(line: line, column: 1)),
+      );
+
+      AuditResult mixedSeverityResult() => AuditResult(
+        issues: [
+          issueAt(AuditSeverity.info, 1),
+          issueAt(AuditSeverity.warning, 2),
+          issueAt(AuditSeverity.error, 3),
+        ],
+        filesScanned: 3,
+        duration: Duration.zero,
+      );
+
+      test('info threshold: issueCount equals all three issues', () {
+        final filtered = mixedSeverityResult().filteredBySeverity(
+          AuditSeverity.info,
+        );
+        final decoded =
+            jsonDecode(reporter.render(filtered, target: '.'))
+                as Map<String, Object?>;
+
+        expect(decoded['issueCount'], 3);
+        expect(decoded['infoCount'], 1);
+        expect(decoded['warningCount'], 1);
+        expect(decoded['errorCount'], 1);
+        expect((decoded['issues'] as List), hasLength(3));
+      });
+
+      test('warning threshold: issueCount matches the filtered set', () {
+        final filtered = mixedSeverityResult().filteredBySeverity(
+          AuditSeverity.warning,
+        );
+        final decoded =
+            jsonDecode(reporter.render(filtered, target: '.'))
+                as Map<String, Object?>;
+
+        expect(decoded['issueCount'], 2);
+        expect(decoded['infoCount'], 0);
+        expect(decoded['warningCount'], 1);
+        expect(decoded['errorCount'], 1);
+        final severities = (decoded['issues'] as List)
+            .cast<Map<String, Object?>>()
+            .map((issue) => issue['severity'])
+            .toList();
+        expect(severities, ['warning', 'error']);
+      });
+
+      test('error threshold: issueCount equals only the error issue', () {
+        final filtered = mixedSeverityResult().filteredBySeverity(
+          AuditSeverity.error,
+        );
+        final decoded =
+            jsonDecode(reporter.render(filtered, target: '.'))
+                as Map<String, Object?>;
+
+        expect(decoded['issueCount'], 1);
+        expect(decoded['infoCount'], 0);
+        expect(decoded['warningCount'], 0);
+        expect(decoded['errorCount'], 1);
+        final issues = (decoded['issues'] as List).cast<Map<String, Object?>>();
+        expect(issues.single['severity'], 'error');
+      });
+    });
   });
 }

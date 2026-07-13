@@ -107,5 +107,63 @@ void main() {
       final output = reporter.render(result, target: '.');
       expect(output, isNot(contains('\x1B[')));
     });
+
+    group('rendering a result already filtered by minimum severity', () {
+      AuditIssue issueAt(AuditSeverity severity, int line) => AuditIssue(
+        ruleId: 'r',
+        severity: severity,
+        message: 'm $severity',
+        filePath: 'lib/a.dart',
+        range: SourceRange(start: SourceLocation(line: line, column: 1)),
+      );
+
+      AuditResult mixedSeverityResult() => AuditResult(
+        issues: [
+          issueAt(AuditSeverity.info, 1),
+          issueAt(AuditSeverity.warning, 2),
+          issueAt(AuditSeverity.error, 3),
+        ],
+        filesScanned: 3,
+        duration: Duration.zero,
+      );
+
+      test('info threshold shows every issue and every count', () {
+        final filtered = mixedSeverityResult().filteredBySeverity(
+          AuditSeverity.info,
+        );
+        final output = reporter.render(filtered, target: '.');
+
+        expect(output, contains('Issues: 3'));
+        expect(output, contains('Info: 1'));
+        expect(output, contains('Warnings: 1'));
+        expect(output, contains('Errors: 1'));
+      });
+
+      test('warning threshold hides the info issue', () {
+        final filtered = mixedSeverityResult().filteredBySeverity(
+          AuditSeverity.warning,
+        );
+        final output = reporter.render(filtered, target: '.');
+
+        expect(output, contains('Issues: 2'));
+        expect(output, contains('Info: 0'));
+        expect(output, contains('Warnings: 1'));
+        expect(output, contains('Errors: 1'));
+        expect(output, isNot(contains('m AuditSeverity.info')));
+      });
+
+      test('error threshold shows only the error issue', () {
+        final filtered = mixedSeverityResult().filteredBySeverity(
+          AuditSeverity.error,
+        );
+        final output = reporter.render(filtered, target: '.');
+
+        expect(output, contains('Issues: 1'));
+        expect(output, contains('Info: 0'));
+        expect(output, contains('Warnings: 0'));
+        expect(output, contains('Errors: 1'));
+        expect(output, isNot(contains('m AuditSeverity.warning')));
+      });
+    });
   });
 }

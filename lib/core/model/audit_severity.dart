@@ -31,3 +31,20 @@ enum AuditSeverity {
   /// Indicates a rule violation that should be addressed.
   error,
 }
+
+/// An explicit, closed-set ranking of [AuditSeverity] values, from least to
+/// most severe.
+///
+/// This is deliberately introduced only now that a real feature (minimum-
+/// severity filtering, `devaudit scan --min-severity`) needs to compare
+/// severities. It is a `switch` over every value rather than a reuse of
+/// enum declaration order, so that adding a future severity forces a
+/// compile error here until its rank is assigned intentionally.
+extension AuditSeverityRanking on AuditSeverity {
+  /// This severity's rank; a higher number means more severe.
+  int get rank => switch (this) {
+    AuditSeverity.info => 0,
+    AuditSeverity.warning => 1,
+    AuditSeverity.error => 2,
+  };
+}

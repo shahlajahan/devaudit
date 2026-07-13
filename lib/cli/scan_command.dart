@@ -11,11 +11,20 @@ import 'package:args/command_runner.dart';
 import '../core/engine/audit_engine.dart';
 import '../core/model/audit_context.dart';
 import '../core/model/audit_result.dart';
+import '../core/model/audit_severity.dart';
 import '../core/report/audit_reporter.dart';
+import '../core/report/report_bundle.dart';
+import '../core/report/report_bundle_generator.dart';
 import '../plugins/flutter/flutter_audit_plugin.dart';
+import '../report/agent_task_bundle_generator.dart';
 import '../report/console_reporter.dart';
+import '../report/folder_markdown_bundle_generator.dart';
 import '../report/json_reporter.dart';
+import '../report/per_file_markdown_bundle_generator.dart';
+import '../report/summary_bundle_generator.dart';
 import 'exit_codes.dart';
+import 'report_bundle_composer.dart';
+import 'report_bundle_writer.dart';
 
 /// Implements `devaudit scan [target]`.
 ///
@@ -40,6 +49,15 @@ class ScanCommand extends Command<int> {
         defaultsTo: 'error',
         help: 'The minimum severity that causes a non-zero exit code.',
       )
+      ..addOption(
+        'min-severity',
+        allowed: ['info', 'warning', 'error'],
+        defaultsTo: 'info',
+        help:
+            'The minimum severity to include in the rendered report. Does '
+            'not affect --fail-on, which always evaluates the full, '
+            'unfiltered scan.',
+      )
       ..addMultiOption(
         'include',
         help: 'Additional files or directories to include.',
@@ -52,6 +70,35 @@ class ScanCommand extends Command<int> {
         'verbose',
         negatable: false,
         help: 'Print extra diagnostic information to stderr.',
+      )
+      ..addFlag(
+        'report',
+        negatable: false,
+        help:
+            'Generate a multi-file report bundle (summary.md, summary.json, '
+            'and one Markdown file per source file with findings) under '
+            '--report-dir, in addition to any --format/--output report.',
+      )
+      ..addOption(
+        'report-dir',
+        defaultsTo: 'devaudit-report',
+        help:
+            'Directory to write --report/--report-folders/--agent-tasks '
+            'output to. Requires --report.',
+      )
+      ..addFlag(
+        'report-folders',
+        negatable: false,
+        help:
+            'Additionally generate folder-grouped Markdown reports. '
+            'Requires --report.',
+      )
+      ..addFlag(
+        'agent-tasks',
+        negatable: false,
+        help:
+            'Additionally generate an AI-agent task bundle under '
+            '<report-dir>/agent/. Requires --report.',
       );
   }
 
@@ -73,6 +120,18 @@ class ScanCommand extends Command<int> {
         'Too many arguments. Expected at most one target directory.',
       );
     }
+
+    final report = args.flag('report');
+    final reportFolders = args.flag('report-folders');
+    final agentTasks = args.flag('agent-tasks');
+    if (!report) {
+      if (reportFolders) usageException('--report-folders requires --report.');
+      if (agentTasks) usageException('--agent-tasks requires --report.');
+      if (args.wasParsed('report-dir')) {
+        usageException('--report-dir requires --report.');
+      }
+    }
+
     final targetArg = args.rest.isEmpty ? '.' : args.rest.single;
 
     final targetDirectory = Directory(targetArg);
@@ -85,6 +144,9 @@ class ScanCommand extends Command<int> {
 
     final format = args.option('format')!;
     final failOn = args.option('fail-on')!;
+    final minSeverity = AuditSeverity.values.byName(
+      args.option('min-severity')!,
+    );
     final outputPath = args.option('output');
     final include = args.multiOption('include');
     final exclude = args.multiOption('exclude');
@@ -117,7 +179,11 @@ class ScanCommand extends Command<int> {
     final AuditReporter reporter = format == 'json'
         ? const JsonReporter()
         : const ConsoleReporter();
-    final rendered = reporter.render(result, target: targetArg);
+    // Only the rendered report is filtered; --fail-on below always
+    // evaluates the original, unfiltered result, so hiding issues from the
+    // report never changes CI behavior.
+    final renderedResult = result.filteredBySeverity(minSeverity);
+    final rendered = reporter.render(renderedResult, target: targetArg);
 
     if (outputPath != null) {
       try {
@@ -133,6 +199,18 @@ class ScanCommand extends Command<int> {
       if (!rendered.endsWith('\n')) stdout.writeln();
     }
 
+    if (report) {
+      final exitCode = _writeReportBundle(
+        renderedResult,
+        target: targetArg,
+        reportDir: Directory(args.option('report-dir')!),
+        includeFolders: reportFolders,
+        includeAgentTasks: agentTasks,
+        verbose: verbose,
+      );
+      if (exitCode != null) return exitCode;
+    }
+
     return _exitCodeFor(result, failOn);
   }
 
@@ -144,5 +222,56 @@ class ScanCommand extends Command<int> {
       _ => false,
     };
     return reached ? failThresholdExitCode : 0;
+  }
+
+  /// Generates and writes the `--report` bundle. Returns an exit code to
+  /// return immediately on failure, or `null` on success.
+  int? _writeReportBundle(
+    AuditResult renderedResult, {
+    required String target,
+    required Directory reportDir,
+    required bool includeFolders,
+    required bool includeAgentTasks,
+    required bool verbose,
+  }) {
+    final generators = <ReportBundleGenerator>[
+      const SummaryBundleGenerator(),
+      const PerFileMarkdownBundleGenerator(),
+      if (includeFolders) const FolderMarkdownBundleGenerator(),
+      if (includeAgentTasks) const AgentTaskBundleGenerator(),
+    ];
+
+    final ReportBundle composed;
+    try {
+      composed = const ReportBundleComposer().compose([
+        for (final generator in generators)
+          generator.generate(renderedResult, target: target),
+      ]);
+    } on StateError catch (error) {
+      stderr.writeln(
+        'devaudit: could not build report bundle: ${error.message}',
+      );
+      return executionErrorExitCode;
+    }
+
+    try {
+      writeReportBundle(composed, outputDir: reportDir);
+    } on UnsafeReportDirectoryException catch (error) {
+      stderr.writeln('devaudit: $error');
+      return executionErrorExitCode;
+    } on FileSystemException catch (error) {
+      stderr.writeln(
+        'devaudit: could not write report bundle: ${error.message}',
+      );
+      return executionErrorExitCode;
+    }
+
+    if (verbose) {
+      stderr.writeln(
+        'devaudit: wrote ${composed.documents.length} report document(s) to '
+        '${reportDir.path}',
+      );
+    }
+    return null;
   }
 }

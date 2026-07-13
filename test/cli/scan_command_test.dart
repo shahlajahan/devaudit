@@ -129,6 +129,337 @@ void main() {
     });
   });
 
+  group('devaudit scan --min-severity', () {
+    late Directory tempDir;
+
+    setUp(
+      () => tempDir = Directory.systemTemp.createTempSync('devaudit_test_'),
+    );
+    tearDown(() => tempDir.deleteSync(recursive: true));
+
+    test(
+      'an invalid --min-severity returns the usage error exit code',
+      () async {
+        final exitCode = await DevAuditCommandRunner().run([
+          'scan',
+          _fixtureRoot,
+          '--min-severity=critical',
+        ]);
+        expect(exitCode, 2);
+      },
+    );
+
+    test('defaults to info, matching today\'s unfiltered behavior', () async {
+      final outputPath = p.join(tempDir.path, 'report.json');
+      await DevAuditCommandRunner().run([
+        'scan',
+        _fixtureRoot,
+        '--format=json',
+        '--fail-on=none',
+        '--output=$outputPath',
+      ]);
+      final decoded =
+          jsonDecode(File(outputPath).readAsStringSync())
+              as Map<String, Object?>;
+
+      // This fixture only ever produces warning-severity issues.
+      expect(decoded['issueCount'], 14);
+      expect(decoded['warningCount'], 14);
+    });
+
+    test(
+      '--min-severity=warning is unaffected by an all-warning result',
+      () async {
+        final outputPath = p.join(tempDir.path, 'report.json');
+        await DevAuditCommandRunner().run([
+          'scan',
+          _fixtureRoot,
+          '--format=json',
+          '--fail-on=none',
+          '--min-severity=warning',
+          '--output=$outputPath',
+        ]);
+        final decoded =
+            jsonDecode(File(outputPath).readAsStringSync())
+                as Map<String, Object?>;
+
+        expect(decoded['issueCount'], 14);
+      },
+    );
+
+    test(
+      '--min-severity=error hides every issue from the report, but '
+      '--fail-on=warning still fails (fail-on uses the unfiltered result)',
+      () async {
+        final outputPath = p.join(tempDir.path, 'report.json');
+        final exitCode = await DevAuditCommandRunner().run([
+          'scan',
+          _fixtureRoot,
+          '--format=json',
+          '--fail-on=warning',
+          '--min-severity=error',
+          '--output=$outputPath',
+        ]);
+
+        // The rendered report is fully filtered...
+        final decoded =
+            jsonDecode(File(outputPath).readAsStringSync())
+                as Map<String, Object?>;
+        expect(decoded['issueCount'], 0);
+        expect(decoded['warningCount'], 0);
+        expect((decoded['issues'] as List), isEmpty);
+
+        // ...but CI behavior is untouched: --fail-on still evaluates the
+        // original, unfiltered scan, which does contain warnings.
+        expect(exitCode, 1);
+      },
+    );
+
+    test(
+      'the console report reflects --min-severity=error the same way',
+      () async {
+        final outputPath = p.join(tempDir.path, 'report.txt');
+        await DevAuditCommandRunner().run([
+          'scan',
+          _fixtureRoot,
+          '--fail-on=none',
+          '--min-severity=error',
+          '--output=$outputPath',
+        ]);
+        final content = File(outputPath).readAsStringSync();
+
+        expect(content, contains('No issues found.'));
+        expect(content, contains('Issues: 0'));
+      },
+    );
+  });
+
+  group('devaudit scan --report dependency validation', () {
+    test('--report-folders without --report is a usage error', () async {
+      final exitCode = await DevAuditCommandRunner().run([
+        'scan',
+        _fixtureRoot,
+        '--report-folders',
+      ]);
+      expect(exitCode, 2);
+    });
+
+    test('--agent-tasks without --report is a usage error', () async {
+      final exitCode = await DevAuditCommandRunner().run([
+        'scan',
+        _fixtureRoot,
+        '--agent-tasks',
+      ]);
+      expect(exitCode, 2);
+    });
+
+    test('--report-dir without --report is a usage error', () async {
+      final exitCode = await DevAuditCommandRunner().run([
+        'scan',
+        _fixtureRoot,
+        '--report-dir=somewhere',
+      ]);
+      expect(exitCode, 2);
+    });
+  });
+
+  group('devaudit scan --report', () {
+    late Directory tempDir;
+
+    setUp(
+      () => tempDir = Directory.systemTemp.createTempSync(
+        'devaudit_report_test_',
+      ),
+    );
+    tearDown(() => tempDir.deleteSync(recursive: true));
+
+    test(
+      'generates summary.md, summary.json, and files/** under --report-dir',
+      () async {
+        final reportDir = p.join(tempDir.path, 'out');
+        final exitCode = await DevAuditCommandRunner().run([
+          'scan',
+          _fixtureRoot,
+          '--report',
+          '--report-dir=$reportDir',
+          '--fail-on=none',
+        ]);
+
+        expect(exitCode, 0);
+        expect(File(p.join(reportDir, 'summary.md')).existsSync(), isTrue);
+        expect(File(p.join(reportDir, 'summary.json')).existsSync(), isTrue);
+        expect(
+          File(p.join(reportDir, '.devaudit-report')).existsSync(),
+          isTrue,
+        );
+        expect(
+          File(
+            p.join(reportDir, 'files', 'lib', 'positive_cases.dart.md'),
+          ).existsSync(),
+          isTrue,
+        );
+        // Not requested, so must not be present.
+        expect(Directory(p.join(reportDir, 'folders')).existsSync(), isFalse);
+        expect(Directory(p.join(reportDir, 'agent')).existsSync(), isFalse);
+      },
+    );
+
+    test('--report-folders additionally writes folders/**', () async {
+      final reportDir = p.join(tempDir.path, 'out');
+      await DevAuditCommandRunner().run([
+        'scan',
+        _fixtureRoot,
+        '--report',
+        '--report-folders',
+        '--report-dir=$reportDir',
+        '--fail-on=none',
+      ]);
+
+      expect(File(p.join(reportDir, 'folders', 'lib.md')).existsSync(), isTrue);
+    });
+
+    test('--agent-tasks additionally writes agent/ (not hidden)', () async {
+      final reportDir = p.join(tempDir.path, 'out');
+      await DevAuditCommandRunner().run([
+        'scan',
+        _fixtureRoot,
+        '--report',
+        '--agent-tasks',
+        '--report-dir=$reportDir',
+        '--fail-on=none',
+      ]);
+
+      expect(
+        File(p.join(reportDir, 'agent', 'manifest.json')).existsSync(),
+        isTrue,
+      );
+      expect(Directory(p.join(reportDir, '.agent')).existsSync(), isFalse);
+    });
+
+    test(
+      'the bundle reflects --min-severity filtering, same as the traditional report',
+      () async {
+        final reportDir = p.join(tempDir.path, 'out');
+        await DevAuditCommandRunner().run([
+          'scan',
+          _fixtureRoot,
+          '--report',
+          '--min-severity=error',
+          '--report-dir=$reportDir',
+          '--fail-on=none',
+        ]);
+
+        // This fixture only ever produces warning-severity issues, so at
+        // --min-severity=error every per-file document is filtered away.
+        final summaryJson =
+            jsonDecode(
+                  File(p.join(reportDir, 'summary.json')).readAsStringSync(),
+                )
+                as Map<String, Object?>;
+        expect(summaryJson['summary'], containsPair('issues', 0));
+        // No per-file documents survive the filter, so files/ is never
+        // even created.
+        expect(Directory(p.join(reportDir, 'files')).existsSync(), isFalse);
+      },
+    );
+
+    test(
+      '--fail-on still evaluates the unfiltered result even when --report hides everything',
+      () async {
+        final reportDir = p.join(tempDir.path, 'out');
+        final exitCode = await DevAuditCommandRunner().run([
+          'scan',
+          _fixtureRoot,
+          '--report',
+          '--min-severity=error',
+          '--fail-on=warning',
+          '--report-dir=$reportDir',
+        ]);
+
+        expect(exitCode, 1);
+      },
+    );
+
+    test(
+      '--format=json and --report can be produced from one invocation',
+      () async {
+        final reportDir = p.join(tempDir.path, 'out');
+        final outputPath = p.join(tempDir.path, 'report.json');
+        final exitCode = await DevAuditCommandRunner().run([
+          'scan',
+          _fixtureRoot,
+          '--format=json',
+          '--output=$outputPath',
+          '--report',
+          '--report-dir=$reportDir',
+          '--fail-on=none',
+        ]);
+
+        expect(exitCode, 0);
+        expect(
+          (jsonDecode(File(outputPath).readAsStringSync()) as Map)['issues'],
+          isNotEmpty,
+        );
+        expect(File(p.join(reportDir, 'summary.md')).existsSync(), isTrue);
+      },
+    );
+
+    test(
+      're-running against the same report-dir clears stale documents',
+      () async {
+        final reportDir = p.join(tempDir.path, 'out');
+        await DevAuditCommandRunner().run([
+          'scan',
+          _fixtureRoot,
+          '--report',
+          '--agent-tasks',
+          '--report-dir=$reportDir',
+          '--fail-on=none',
+        ]);
+        expect(
+          File(p.join(reportDir, 'agent', 'manifest.json')).existsSync(),
+          isTrue,
+        );
+
+        // Second run without --agent-tasks: the marker lets devaudit clear
+        // the previous run's output, so agent/ must not linger.
+        await DevAuditCommandRunner().run([
+          'scan',
+          _fixtureRoot,
+          '--report',
+          '--report-dir=$reportDir',
+          '--fail-on=none',
+        ]);
+
+        expect(Directory(p.join(reportDir, 'agent')).existsSync(), isFalse);
+        expect(File(p.join(reportDir, 'summary.md')).existsSync(), isTrue);
+      },
+    );
+
+    test(
+      'refuses to write into a non-empty, unmarked existing directory',
+      () async {
+        final reportDir = p.join(tempDir.path, 'out');
+        Directory(reportDir).createSync(recursive: true);
+        File(p.join(reportDir, 'unrelated.txt')).writeAsStringSync('mine');
+
+        final exitCode = await DevAuditCommandRunner().run([
+          'scan',
+          _fixtureRoot,
+          '--report',
+          '--report-dir=$reportDir',
+          '--fail-on=none',
+        ]);
+
+        expect(exitCode, 2);
+        expect(
+          File(p.join(reportDir, 'unrelated.txt')).readAsStringSync(),
+          'mine',
+        );
+      },
+    );
+  });
+
   group('devaudit scan does not modify the scanned project', () {
     test('fixture files are untouched after a scan', () async {
       final targetFile = File(

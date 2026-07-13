@@ -49,6 +49,34 @@ Not yet published to pub.dev.
 - Test suite covering core serialization/sorting/aggregation, the
   localization rule's positive/negative/suppression fixtures, both
   reporters, and CLI exit-code behavior.
+- `--min-severity` option on `devaudit scan`: filters which issues are
+  *rendered* (console or JSON) to `info`/`warning`/`error` and above,
+  independent of `--fail-on`, which always evaluates the full, unfiltered
+  scan. `AuditSeverityRanking` (`lib/core/model/audit_severity.dart`)
+  introduces an explicit, closed-set severity ranking for this purpose.
+  `AuditResult.filteredBySeverity()` returns a filtered copy of a result
+  with all summary counts recomputed for the filtered set.
+- Multi-file report bundles (ADR-0003): `--report` generates
+  `summary.md`/`summary.json` plus one Markdown document per source file
+  with findings, mirroring the source tree exactly (e.g.
+  `files/lib/ui/vet_page.dart.md`), instead of one large report that
+  exceeds terminal/AI-context limits on real projects. `--report-folders`
+  additionally generates folder-grouped reports; `--agent-tasks`
+  additionally generates an AI-agent task bundle
+  (`agent/manifest.json`, `agent/tasks/NNNN_<slug>.md`) with one task per
+  file, each carrying its findings and a suggested objective derived from
+  the file's existing `AuditIssue.suggestion` values. New public core
+  contracts: `ReportBundle`, `ReportDocument`, `ReportBundleGenerator`
+  (`lib/core/report/`), and four built-in generators
+  (`SummaryBundleGenerator`, `PerFileMarkdownBundleGenerator`,
+  `FolderMarkdownBundleGenerator`, `AgentTaskBundleGenerator`,
+  `lib/report/`). The output directory is safely managed via a
+  `.devaudit-report` ownership marker: a missing or empty directory is
+  used freely, a previously-owned (marked) directory is cleared and
+  rebuilt so stale documents never linger, and a non-empty, unmarked
+  directory is refused outright rather than risking user data. ZIP export
+  is intentionally deferred — see
+  `docs/adr/0003-report-bundles-and-agent-tasks.md`.
 
 ### Changed
 

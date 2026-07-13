@@ -96,6 +96,26 @@ class AuditResult {
   int _countOf(AuditSeverity severity) =>
       issues.where((issue) => issue.severity == severity).length;
 
+  /// Returns a copy of this result containing only issues whose severity
+  /// is at least [minSeverity] (via [AuditSeverityRanking.rank]).
+  ///
+  /// [filesScanned], [duration], and [pluginSummaries] are carried over
+  /// unchanged — this filters which *issues* are reported, not anything
+  /// about the scan itself. [infoCount], [warningCount], [errorCount], and
+  /// `issues.length` on the returned result all reflect the filtered set,
+  /// since they are computed from [issues].
+  AuditResult filteredBySeverity(AuditSeverity minSeverity) {
+    if (minSeverity == AuditSeverity.info) return this;
+    return AuditResult(
+      issues: issues
+          .where((issue) => issue.severity.rank >= minSeverity.rank)
+          .toList(),
+      filesScanned: filesScanned,
+      duration: duration,
+      pluginSummaries: pluginSummaries,
+    );
+  }
+
   /// A deterministic JSON representation of this result.
   Map<String, Object?> toJson() => {
     'filesScanned': filesScanned,

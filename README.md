@@ -24,16 +24,20 @@ pub.dev.
 - One built-in plugin: **Flutter/Dart localization**, which parses Dart
   source with `package:analyzer` and implements a single rule:
   `flutter.localization.hardcoded-ui-string`.
-- A `devaudit scan` CLI with console and JSON reporters.
+- A `devaudit scan` CLI with console and JSON reporters, plus an optional
+  multi-file report bundle (`--report`, `--report-folders`,
+  `--agent-tasks`) for large projects and AI-agent workflows.
 
 ### Not implemented yet
 
 Everything under [Roadmap](docs/roadmap/roadmap.md) beyond the items above:
 accessibility/performance/security/architecture audits, dependency health,
 React/TypeScript/Kotlin/Swift support, GitHub Actions, IDE integrations, a
-`--fix` mode, and AI-assisted explanations. Please don't rely on any of this
-existing yet — treat this README as ground truth over the roadmap for what's
-actually built.
+`--fix` mode, and AI-assisted explanations. ZIP export for report bundles
+is also not implemented — see
+[docs/reporting/report-bundles.md](docs/reporting/report-bundles.md).
+Please don't rely on any of this existing yet — treat this README as
+ground truth over the roadmap for what's actually built.
 
 ---
 
@@ -70,6 +74,8 @@ devaudit scan /path/to/project      # scan a specific project
 devaudit scan . --format=json
 devaudit scan . --format=json --output=devaudit-report.json
 devaudit scan . --fail-on=warning   # exit 1 if any warning or error is found
+devaudit scan . --min-severity=warning   # hide info-level issues from the report
+devaudit scan . --report                # generate a multi-file report bundle (see below)
 devaudit --help
 devaudit --version
 ```
@@ -95,9 +101,34 @@ and files carrying a `GENERATED CODE - DO NOT MODIFY BY HAND` header, such as
 | `--format` | `console` | `console` or `json` |
 | `--output` | *(stdout)* | Write the report to a file instead of stdout |
 | `--fail-on` | `error` | `none`, `warning`, or `error` — the minimum severity that causes exit code `1` |
+| `--min-severity` | `info` | `info`, `warning`, or `error` — the minimum severity *rendered in the report*. Does not affect `--fail-on`, which always evaluates the full, unfiltered scan |
 | `--include` | *(none)* | Additional files/directories to analyze |
 | `--exclude` | *(none)* | Additional path substrings to skip |
 | `--verbose` | off | Print per-plugin diagnostics to stderr |
+| `--report` | off | Generate a multi-file report bundle under `--report-dir` — see [Report bundles](#report-bundles) |
+| `--report-dir` | `devaudit-report` | Where to write `--report` output. Requires `--report` |
+| `--report-folders` | off | Additionally generate folder-grouped reports. Requires `--report` |
+| `--agent-tasks` | off | Additionally generate an AI-agent task bundle. Requires `--report` |
+
+## Report bundles
+
+On real projects, a single console or JSON report can exceed both
+terminal/history limits and any AI coding agent's context window.
+`devaudit scan --report` generates a bundle of small, independently
+addressable documents instead: a `summary.md`/`summary.json` overview,
+plus one Markdown report per source file, mirroring the source tree
+exactly (e.g. `files/lib/ui/vet_page.dart.md`). `--report-folders` adds
+folder-grouped reports; `--agent-tasks` adds an `agent/` task bundle
+designed for AI-agent-driven fix workflows, one task per file.
+
+```bash
+devaudit scan . --report --report-folders --agent-tasks
+```
+
+See [docs/reporting/report-bundles.md](docs/reporting/report-bundles.md)
+for the full directory layout, JSON schemas, and output-directory safety
+rules, and [ADR-0003](docs/adr/0003-report-bundles-and-agent-tasks.md) for
+the design rationale.
 
 ## Example console output
 
