@@ -1,5 +1,13 @@
-import 'package:devaudit/devaudit.dart' as devaudit;
+/// DevAudit
+///
+/// Copyright (c) Pharos Labs.
+/// Licensed under the Apache License, Version 2.0.
+library;
 
-void main(List<String> arguments) {
-  print('Hello world: ${devaudit.calculate()}!');
+import 'dart:io';
+
+import 'package:devaudit/cli/devaudit_command_runner.dart';
+
+Future<void> main(List<String> arguments) async {
+  exitCode = await DevAuditCommandRunner().run(arguments);
 }

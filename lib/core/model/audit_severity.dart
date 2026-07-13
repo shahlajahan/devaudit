@@ -2,7 +2,8 @@
 ///
 /// Copyright (c) Pharos Labs.
 /// Licensed under the Apache License, Version 2.0.
-///
+library;
+
 /// Defines the severity level of an [AuditIssue].
 ///
 /// Severity communicates how important a finding is and allows reporters,

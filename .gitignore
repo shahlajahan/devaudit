@@ -1,3 +1,8 @@
 # https://dart.dev/guides/libraries/private-files
 # Created by `dart pub`
 .dart_tool/
+
+# Fixture used by FlutterFileDiscovery tests to verify that a real .dart_tool/
+# directory is pruned; it must stay tracked despite the blanket rule above.
+!test/fixtures/flutter_localization/lib/.dart_tool/
+!test/fixtures/flutter_localization/lib/.dart_tool/**

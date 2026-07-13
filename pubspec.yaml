@@ -1,13 +1,20 @@
 name: devaudit
-description: A sample command-line application.
-version: 1.0.0
-# repository: https://github.com/my_org/my_repo
+description: >-
+  A plugin-based developer audit platform. Analyze. Understand. Improve.
+version: 0.1.0-dev.1
+homepage: https://pharosteknoloji.com.tr
+repository: https://github.com/shahlajahan/devaudit
+issue_tracker: https://github.com/shahlajahan/devaudit/issues
 
 environment:
   sdk: ^3.10.4
 
 # Add regular dependencies here.
 dependencies:
+  analyzer: ^12.1.0
+  args: ^2.7.0
+  collection: ^1.19.0
+  meta: ^1.16.0
   path: ^1.9.0
 
 dev_dependencies:

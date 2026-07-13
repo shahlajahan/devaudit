@@ -13,15 +13,18 @@
 
 include: package:lints/recommended.yaml
 
-# Uncomment the following section to specify additional rules.
+linter:
+  rules:
+    - public_member_api_docs
+    - prefer_single_quotes
+    - unnecessary_lambdas
 
-# linter:
-#   rules:
-#     - camel_case_types
-
-# analyzer:
-#   exclude:
-#     - path/to/excluded/files/**
+analyzer:
+  exclude:
+    # Fixture files intentionally reference Flutter widget APIs without
+    # depending on the Flutter SDK; they are parsed syntactically by the
+    # Flutter plugin's tests, not analyzed as part of this package.
+    - test/fixtures/**
 
 # For more information about the core and recommended set of lints, see
 # https://dart.dev/go/core-lints

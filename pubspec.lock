@@ -10,7 +10,7 @@ packages:
     source: hosted
     version: "99.0.0"
   analyzer:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: analyzer
       sha256: "663efa951fb8a45e06f491223a604c93820598f20e6a99c25617a1576065e8b7"
@@ -18,7 +18,7 @@ packages:
     source: hosted
     version: "12.1.0"
   args:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: args
       sha256: d0481093c50b1da8910eb0bb301626d4d8eb7284aa739614d2b394ee09e3ea04
@@ -50,7 +50,7 @@ packages:
     source: hosted
     version: "0.2.0"
   collection:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: collection
       sha256: "2f5709ae4d3d59dd8f7cd309b4e023046b57d8a6c82130785d2b0e5868084e76"
@@ -154,7 +154,7 @@ packages:
     source: hosted
     version: "0.12.20"
   meta:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: meta
       sha256: "307249ce4ff29d58a18e97f6345f539382eb9c9c29ecda628900f31de0443dd9"
