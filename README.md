@@ -2,48 +2,128 @@
 
 > Analyze. Understand. Improve.
 
-A plugin-based developer audit platform for modern software projects, by
-[Pharos Labs](https://pharosteknoloji.com.tr).
+A plugin-based developer audit platform for modern software projects.
 
-DevAudit's core is a small, language-agnostic engine: it knows how to run
-plugins and combine their findings into one report. It has no idea what
-"Flutter" or "Dart" is. All ecosystem-specific knowledge lives in plugins.
+DevAudit analyzes source code, detects project-specific problems through plugins,
+and produces reports designed for both humans and AI coding agents.
 
----
-
-## Current status
-
-**Pre-1.0, under active development.** The package is not yet published to
-pub.dev.
-
-### Implemented today
-
-- A plugin-based core: `AuditEngine`, `AuditPlugin`, `AuditRule`,
-  `AuditReporter`, and immutable domain models (`AuditIssue`, `AuditResult`,
-  `SourceRange`, `AuditSeverity`, ...).
-- One built-in plugin: **Flutter/Dart localization**, which parses Dart
-  source with `package:analyzer` and implements a single rule:
-  `flutter.localization.hardcoded-ui-string`.
-- A `devaudit scan` CLI with console and JSON reporters, plus an optional
-  multi-file report bundle (`--report`, `--report-folders`,
-  `--agent-tasks`) for large projects and AI-agent workflows.
-
-### Not implemented yet
-
-Everything under [Roadmap](docs/roadmap/roadmap.md) beyond the items above:
-accessibility/performance/security/architecture audits, dependency health,
-React/TypeScript/Kotlin/Swift support, GitHub Actions, IDE integrations, a
-`--fix` mode, and AI-assisted explanations. ZIP export for report bundles
-is also not implemented — see
-[docs/reporting/report-bundles.md](docs/reporting/report-bundles.md).
-Please don't rely on any of this existing yet — treat this README as
-ground truth over the roadmap for what's actually built.
+Built by **Pharos Labs**.
 
 ---
 
-## Installation (development)
+# Why DevAudit?
 
-DevAudit isn't published yet, so run it from a source checkout:
+Traditional linters answer questions like:
+
+- Is this code syntactically correct?
+- Does it follow style rules?
+
+DevAudit answers higher-level questions such as:
+
+- Which user-visible strings still aren't localized?
+- Which files should be fixed first?
+- How can a large audit be split into AI-friendly tasks?
+- How can thousands of findings be organized into reports that fit within an AI agent's context window?
+
+Instead of producing a single huge report, DevAudit generates structured report bundles that make large-scale code improvements practical.
+
+---
+
+# Features
+
+Current capabilities include:
+
+- Plugin-based architecture
+- Language-agnostic audit engine
+- Flutter/Dart localization audit
+- Human-readable console reports
+- Machine-readable JSON reports
+- Multi-file report bundles
+- Folder-level summaries
+- AI-agent task bundles
+- Deterministic output
+- Zero Flutter dependency inside the core engine
+
+---
+
+# Example
+
+Given:
+
+```dart
+Text("Settings")
+Text("Followers")
+Text("Save")
+```
+
+Run:
+
+```bash
+devaudit scan .
+```
+
+Output:
+
+```text
+lib/profile_page.dart
+  9:34  warning  Probable user-visible hardcoded string in Text(data: ...). ('Profile')
+ 10:36  warning  Probable user-visible hardcoded string in Text(data: ...). ('Followers')
+```
+
+Or generate an AI-ready report bundle:
+
+```bash
+devaudit scan . \
+  --report \
+  --report-folders \
+  --agent-tasks
+```
+
+Result:
+
+```text
+devaudit-report/
+
+summary.md
+summary.json
+
+files/
+folders/
+
+agent/
+    manifest.json
+    tasks/
+```
+
+Each task corresponds to exactly one source file, allowing AI coding agents to process very large projects incrementally without exceeding context limits.
+
+---
+
+
+
+# Current Status
+
+**Pre-1.0**
+
+DevAudit is under active development and is not yet published on pub.dev.
+
+Currently implemented:
+
+- Plugin-based audit engine
+- Flutter localization plugin
+- Console reporter
+- JSON reporter
+- Report bundles
+- Folder reports
+- AI-agent task bundles
+
+Future work is tracked in the roadmap.
+
+---
+
+# Installation
+
+Clone the repository:
 
 ```bash
 git clone https://github.com/shahlajahan/devaudit.git
@@ -51,198 +131,189 @@ cd devaudit
 dart pub get
 ```
 
-Run it directly with `dart run`:
+Run directly:
 
 ```bash
-dart run bin/devaudit.dart scan /path/to/your/flutter/project
+dart run bin/devaudit.dart scan .
 ```
 
-Or activate it globally from the local checkout so the `devaudit` command is
-on your `PATH`:
+Or activate it globally from a local checkout:
 
 ```bash
 dart pub global activate --source path .
-devaudit scan /path/to/your/flutter/project
 ```
 
-## CLI quick start
+If the executable is not on your PATH:
 
 ```bash
-devaudit scan                       # scan the current directory
-devaudit scan .                     # same as above, explicit
-devaudit scan /path/to/project      # scan a specific project
-devaudit scan . --format=json
-devaudit scan . --format=json --output=devaudit-report.json
-devaudit scan . --fail-on=warning   # exit 1 if any warning or error is found
-devaudit scan . --min-severity=warning   # hide info-level issues from the report
-devaudit scan . --report                # generate a multi-file report bundle (see below)
-devaudit --help
+export PATH="$HOME/.pub-cache/bin:$PATH"
+```
+
+Verify the installation:
+
+```bash
 devaudit --version
 ```
 
-`devaudit scan` defaults to scanning `lib/` under the target directory,
-skipping `.dart_tool/`, `build/`, `.git/`, and recognized generated files
-(`*.g.dart`, `*.freezed.dart`, `*.gr.dart`, `*.config.dart`, `*.mocks.dart`,
-and files carrying a `GENERATED CODE - DO NOT MODIFY BY HAND` header, such as
-`flutter gen-l10n` output).
+---
 
-### Exit codes
+# Quick Start
 
-| Code | Meaning |
-| ---- | ------- |
-| `0`  | Scan completed and the `--fail-on` threshold was not reached |
-| `1`  | Findings reached the configured `--fail-on` threshold |
-| `2`  | Invalid CLI usage, or an unrecoverable execution/configuration failure |
-
-### Options
-
-| Option | Default | Description |
-| ------ | ------- | ----------- |
-| `--format` | `console` | `console` or `json` |
-| `--output` | *(stdout)* | Write the report to a file instead of stdout |
-| `--fail-on` | `error` | `none`, `warning`, or `error` — the minimum severity that causes exit code `1` |
-| `--min-severity` | `info` | `info`, `warning`, or `error` — the minimum severity *rendered in the report*. Does not affect `--fail-on`, which always evaluates the full, unfiltered scan |
-| `--include` | *(none)* | Additional files/directories to analyze |
-| `--exclude` | *(none)* | Additional path substrings to skip |
-| `--verbose` | off | Print per-plugin diagnostics to stderr |
-| `--report` | off | Generate a multi-file report bundle under `--report-dir` — see [Report bundles](#report-bundles) |
-| `--report-dir` | `devaudit-report` | Where to write `--report` output. Requires `--report` |
-| `--report-folders` | off | Additionally generate folder-grouped reports. Requires `--report` |
-| `--agent-tasks` | off | Additionally generate an AI-agent task bundle. Requires `--report` |
-
-## Report bundles
-
-On real projects, a single console or JSON report can exceed both
-terminal/history limits and any AI coding agent's context window.
-`devaudit scan --report` generates a bundle of small, independently
-addressable documents instead: a `summary.md`/`summary.json` overview,
-plus one Markdown report per source file, mirroring the source tree
-exactly (e.g. `files/lib/ui/vet_page.dart.md`). `--report-folders` adds
-folder-grouped reports; `--agent-tasks` adds an `agent/` task bundle
-designed for AI-agent-driven fix workflows, one task per file.
+Scan the current project:
 
 ```bash
-devaudit scan . --report --report-folders --agent-tasks
+devaudit scan .
 ```
 
-See [docs/reporting/report-bundles.md](docs/reporting/report-bundles.md)
-for the full directory layout, JSON schemas, and output-directory safety
-rules, and [ADR-0003](docs/adr/0003-report-bundles-and-agent-tasks.md) for
-the design rationale.
+Scan another project:
 
-## Example console output
-
-```
-$ devaudit scan test/fixtures/flutter_localization
-
-DevAudit
-
-lib/positive_cases.dart
-  11:34  warning  Probable user-visible hardcoded string in Text(data: ...). ('Settings')  [flutter.localization.hardcoded-ui-string]
-  14:16  warning  Probable user-visible hardcoded string in Text(data: ...). ('Hello')  [flutter.localization.hardcoded-ui-string]
-  15:16  warning  Probable user-visible hardcoded string in Text(data: ...). ("Save")  [flutter.localization.hardcoded-ui-string]
-
-lib/profile_page.dart
-  9:34   warning  Probable user-visible hardcoded string in Text(data: ...). ('Profile')  [flutter.localization.hardcoded-ui-string]
-  10:36  warning  Probable user-visible hardcoded string in Text(data: ...). ('Followers')  [flutter.localization.hardcoded-ui-string]
-  10:55  warning  Probable user-visible hardcoded string in Text(data: ...). ('Following')  [flutter.localization.hardcoded-ui-string]
-
-Summary
-  Files scanned: 6
-  Issues: 14
-  Info: 0
-  Warnings: 14
-  Errors: 0
-  Duration: 84 ms
+```bash
+devaudit scan /path/to/project
 ```
 
-(Truncated for brevity — the real output lists every finding, grouped by file.)
+Generate JSON:
 
-## Example JSON output
-
-```json
-{
-  "filesScanned": 6,
-  "durationMs": 84,
-  "issueCount": 14,
-  "infoCount": 0,
-  "warningCount": 14,
-  "errorCount": 0,
-  "pluginSummaries": [{ "pluginId": "flutter", "filesScanned": 6, "succeeded": true }],
-  "issues": [
-    {
-      "ruleId": "flutter.localization.hardcoded-ui-string",
-      "severity": "warning",
-      "message": "Probable user-visible hardcoded string in Text(data: ...).",
-      "filePath": "lib/positive_cases.dart",
-      "range": { "startLine": 11, "startColumn": 34, "endLine": 11, "endColumn": 44 },
-      "evidence": "'Settings'",
-      "suggestion": "Move this text into the project's localization resources instead of hardcoding it."
-    }
-  ],
-  "schemaVersion": "1.0",
-  "tool": { "name": "devaudit", "version": "0.1.0-dev.1" },
-  "target": "test/fixtures/flutter_localization"
-}
+```bash
+devaudit scan . --format=json
 ```
 
-Paths in every report are project-relative and forward-slashed — never an
-absolute, machine-specific path.
+Write JSON to disk:
+
+```bash
+devaudit scan . \
+  --format=json \
+  --output=report.json
+```
+
+Generate a report bundle:
+
+```bash
+devaudit scan . --report
+```
+
+Generate the complete bundle:
+
+```bash
+devaudit scan . \
+  --report \
+  --report-folders \
+  --agent-tasks
+```
 
 ---
 
-## Architecture
+# CLI Options
+
+| Option | Description |
+|----------|-------------|
+| `--format` | `console` or `json` |
+| `--output` | Write the report to a file |
+| `--fail-on` | Exit-code threshold |
+| `--min-severity` | Minimum rendered severity |
+| `--include` | Additional files/directories |
+| `--exclude` | Additional ignored paths |
+| `--verbose` | Plugin diagnostics |
+| `--report` | Generate report bundle |
+| `--report-folders` | Generate folder summaries |
+| `--agent-tasks` | Generate AI task bundle |
+
+---
+
+# Report Bundles
+
+Large projects often contain hundreds or thousands of findings.
+
+Instead of producing one enormous report, DevAudit can split results into independently addressable documents.
+
+The generated bundle contains:
+
+- `summary.md`
+- `summary.json`
+- One Markdown report per source file
+- Optional folder reports
+- Optional AI-agent task bundles
+
+This enables:
+
+- Incremental review
+- Parallel work
+- AI-assisted refactoring
+- Avoiding LLM context-window limitations
+
+See:
 
 ```
-CLI / application layer
-        │
-        ▼
-Core contracts and engine   (no Flutter, no analyzer, no args, no dart:io*)
-        ▲
-        │ implements
-Plugins (e.g. Flutter)
+docs/reporting/report-bundles.md
 ```
 
-The core (`lib/core/`) defines immutable domain models and the
-`AuditPlugin` / `AuditRule` / `AuditReporter` contracts, plus the
-`AuditEngine` that runs plugins and merges their issues into one
-deterministically ordered `AuditResult`. It never imports Flutter,
-`package:analyzer`, `package:args`, `package:yaml`, or any plugin or CLI
-code. The Flutter/Dart plugin (`lib/plugins/flutter/`) is a normal
-consumer of those contracts, not a special case.
+---
 
-See [docs/architecture/overview.md](docs/architecture/overview.md),
-[docs/architecture/domain-model.md](docs/architecture/domain-model.md), and
-[docs/architecture/audit-flow.md](docs/architecture/audit-flow.md) for more
-detail, and [docs/adr/](docs/adr/) for the underlying decision record.
+# Architecture
 
-## The localization rule
+```
+CLI
+ │
+ ▼
+Audit Engine
+ │
+ ▼
+Plugins
+ │
+ ▼
+Rules
+```
 
-`flutter.localization.hardcoded-ui-string` looks for probable user-visible
-strings hardcoded directly into common Flutter UI APIs (`Text`, `TextSpan`,
-`InputDecoration`, `Tooltip`, `Semantics`, and more), while recognizing
-common localization patterns (`context.l10n`, `AppLocalizations.of(context)`,
-`.tr()`, `S.of(context)`, and similar) so it doesn't flag text that's already
-localized. See
-[docs/rules/flutter-hardcoded-ui-string.md](docs/rules/flutter-hardcoded-ui-string.md)
-for the full list of detected APIs, exclusions, and false-positive
-boundaries.
+The core engine knows nothing about Flutter, Dart, or localization.
 
-### Suppressing a finding
+Everything language-specific lives inside plugins.
+
+This allows future plugins for ecosystems such as:
+
+- React
+- TypeScript
+- Kotlin
+- Swift
+- Rust
+
+without changing the engine itself.
+
+---
+
+# Flutter Localization Plugin
+
+Current built-in rule:
+
+```
+flutter.localization.hardcoded-ui-string
+```
+
+Detects probable user-visible hardcoded strings inside common Flutter widgets, including:
+
+- Text
+- TextSpan
+- Tooltip
+- InputDecoration
+- Semantics
+- BottomNavigationBarItem
+- IconButton tooltips
+- AppBar titles
+- and other common UI APIs
+
+Already-localized strings are automatically ignored.
+
+---
+
+# Suppressing Findings
+
+Suppress a single line:
 
 ```dart
-Text('Debug label'), // devaudit-ignore: flutter.localization.hardcoded-ui-string
+Text(
+  "Debug",
+); // devaudit-ignore: flutter.localization.hardcoded-ui-string
 ```
 
-or, on the line above the flagged code:
-
-```dart
-// devaudit-ignore: flutter.localization.hardcoded-ui-string
-Text('Debug label'),
-```
-
-To suppress every finding for this rule in an entire file, add this near the
-top of the file:
+Suppress an entire file:
 
 ```dart
 // devaudit-ignore-file: flutter.localization.hardcoded-ui-string
@@ -250,15 +321,77 @@ top of the file:
 
 ---
 
-## Roadmap
+# Exit Codes
 
-See [docs/roadmap/roadmap.md](docs/roadmap/roadmap.md).
+| Code | Meaning |
+|------|---------|
+| `0` | Scan completed successfully |
+| `1` | Findings reached the configured `--fail-on` threshold |
+| `2` | Invalid CLI usage or execution failure |
 
-## Contributing
+---
 
-Contributions are welcome. Contribution guidelines will be published in
-`CONTRIBUTING.md`.
+# Documentation
 
-## License
+Architecture
 
-Apache License 2.0 — see [LICENSE](LICENSE).
+```
+docs/architecture/
+```
+
+Rules
+
+```
+docs/rules/
+```
+
+Architecture Decision Records
+
+```
+docs/adr/
+```
+
+Roadmap
+
+```
+docs/roadmap/
+```
+
+---
+
+# Roadmap
+
+Upcoming work includes:
+
+- Accessibility audits
+- Performance audits
+- Security audits
+- Architecture audits
+- Dependency health analysis
+- Additional language plugins
+- GitHub Actions integration
+- IDE integrations
+- AI-assisted explanations
+- Automatic fixes (`--fix`)
+
+See:
+
+```
+docs/roadmap/roadmap.md
+```
+
+---
+
+# Contributing
+
+Contributions are welcome.
+
+Contribution guidelines will be published in `CONTRIBUTING.md`.
+
+---
+
+# License
+
+Apache License 2.0
+
+See `LICENSE`.

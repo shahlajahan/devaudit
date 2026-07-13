@@ -9,3 +9,6 @@
 
 # Default output of `devaudit scan --report` when run from the repo root.
 /devaudit-report/
+
+# Generated example reports
+/examples/flutter_localization/devaudit-report/

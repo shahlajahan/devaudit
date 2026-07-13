@@ -1,0 +1,10 @@
+name: flutter_localization_example
+description: Example project for DevAudit localization scanning.
+publish_to: "none"
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
