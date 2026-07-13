@@ -1,7 +1,9 @@
 name: devaudit
 description: >-
   A plugin-based developer audit platform. Analyze. Understand. Improve.
+
 version: 0.1.0-dev.2
+
 homepage: https://pharosteknoloji.com.tr
 repository: https://github.com/shahlajahan/devaudit
 issue_tracker: https://github.com/shahlajahan/devaudit/issues
@@ -9,7 +11,9 @@ issue_tracker: https://github.com/shahlajahan/devaudit/issues
 environment:
   sdk: ^3.10.4
 
-# Add regular dependencies here.
+executables:
+  devaudit:
+
 dependencies:
   analyzer: ^12.1.0
   args: ^2.7.0

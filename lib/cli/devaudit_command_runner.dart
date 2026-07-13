@@ -8,7 +8,7 @@ import 'dart:io';
 
 import 'package:args/command_runner.dart';
 
-import '../report/json_reporter.dart' show toolVersion;
+import '../shared/tool_version.dart';
 import 'exit_codes.dart';
 import 'scan_command.dart';
 

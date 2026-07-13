@@ -8,11 +8,7 @@ import 'dart:convert';
 
 import '../core/model/audit_result.dart';
 import '../core/report/audit_reporter.dart';
-
-/// The DevAudit version stamped onto every JSON report.
-///
-/// Kept in sync manually with the `version` field in `pubspec.yaml`.
-const toolVersion = '0.1.0-dev.1';
+import '../shared/tool_version.dart';
 
 /// Renders an [AuditResult] as deterministic, pretty-printed JSON.
 ///

@@ -37,7 +37,7 @@ export 'plugins/flutter/flutter_audit_plugin.dart';
 
 // Built-in reporters.
 export 'report/console_reporter.dart';
-export 'report/json_reporter.dart' hide toolVersion;
+export 'report/json_reporter.dart';
 
 // Built-in report bundle generators.
 export 'report/agent_task_bundle_generator.dart';

@@ -12,7 +12,7 @@ import '../core/model/audit_issue.dart';
 import '../core/model/audit_result.dart';
 import '../core/report/report_bundle.dart';
 import '../core/report/report_bundle_generator.dart';
-import 'json_reporter.dart' show toolVersion;
+import '../shared/tool_version.dart';
 import 'report_bundle_helpers.dart';
 
 const _safetyPreamble =
