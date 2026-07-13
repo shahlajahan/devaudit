@@ -247,11 +247,19 @@ class ScanCommand extends Command<int> {
     required Directory reportDir,
     required bool includeAgentTasks,
   }) {
+    final affectedFiles = result.issues
+        .map((issue) => issue.filePath)
+        .toSet()
+        .length;
+
     final buffer = StringBuffer()
       ..writeln('DevAudit')
       ..writeln()
+      ..writeln('✓ Scan completed')
+      ..writeln()
       ..writeln('Summary')
       ..writeln('  Files scanned: ${result.filesScanned}')
+      ..writeln('  Affected files: $affectedFiles')
       ..writeln('  Issues: ${result.issues.length}')
       ..writeln('  Warnings: ${result.warningCount}')
       ..writeln('  Errors: ${result.errorCount}')
@@ -266,6 +274,7 @@ class ScanCommand extends Command<int> {
       buffer
         ..writeln()
         ..writeln('AI agent bundle:')
+        ..writeln()
         ..writeln('  ${p.join(reportDir.path, 'agent')}/');
     }
 

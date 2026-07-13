@@ -31,6 +31,13 @@ class SummaryBundleGenerator extends ReportBundleGenerator {
   /// start at `"1.0"`.
   static const schemaVersion = '1.0';
 
+  /// The maximum number of rows shown in `summary.md`'s "by folder"/"by
+  /// file" tables. This only shortens the Markdown summary for
+  /// readability on large scans; `summary.json`'s `byFolder`/`byFile`
+  /// arrays are never truncated, and the full per-folder/per-file
+  /// documents always exist regardless of this limit.
+  static const maxSummaryTableRows = 20;
+
   @override
   ReportBundle generate(AuditResult result, {required String target}) {
     final byRule = <String, int>{};
@@ -76,10 +83,16 @@ class SummaryBundleGenerator extends ReportBundleGenerator {
     List<MapEntry<String, int>> byFolder,
     List<MapEntry<String, int>> byFile,
   ) {
+    final affectedFiles = result.issues
+        .map((issue) => issue.filePath)
+        .toSet()
+        .length;
+
     final buffer = StringBuffer()
       ..writeln('# DevAudit Summary')
       ..writeln()
       ..writeln('- Files scanned: ${result.filesScanned}')
+      ..writeln('- Affected files: $affectedFiles')
       ..writeln('- Issues: ${result.issues.length}')
       ..writeln('- Info: ${result.infoCount}')
       ..writeln('- Warnings: ${result.warningCount}')
@@ -105,11 +118,14 @@ class SummaryBundleGenerator extends ReportBundleGenerator {
         ..writeln()
         ..writeln('| Folder | Count |')
         ..writeln('| --- | --- |');
-      for (final entry in byFolder) {
+      for (final entry in byFolder.take(maxSummaryTableRows)) {
         buffer.writeln(
           '| [${entry.key}](folders/${entry.key}.md) | ${entry.value} |',
         );
       }
+      buffer
+        ..writeln()
+        ..writeln('See folders/ for the complete folder reports.');
     }
 
     if (byFile.isNotEmpty) {
@@ -119,11 +135,14 @@ class SummaryBundleGenerator extends ReportBundleGenerator {
         ..writeln()
         ..writeln('| File | Count |')
         ..writeln('| --- | --- |');
-      for (final entry in byFile) {
+      for (final entry in byFile.take(maxSummaryTableRows)) {
         buffer.writeln(
           '| [${entry.key}](files/${entry.key}.md) | ${entry.value} |',
         );
       }
+      buffer
+        ..writeln()
+        ..writeln('See files/ for the complete per-file reports.');
     }
 
     if (result.issues.isEmpty) {
