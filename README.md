@@ -2,10 +2,38 @@
 
 > Analyze. Understand. Improve.
 
-A plugin-based developer audit platform for modern software projects.
+A plugin-based developer audit platform for modern software projects, by
+[Pharos Labs](https://pharosteknoloji.com.tr).
 
-DevAudit analyzes source code, detects project-specific problems through plugins,
-and produces reports designed for both humans and AI coding agents.
+---
+
+## Quick demo
+
+```bash
+$ devaudit scan examples/flutter_localization/project
+
+DevAudit
+
+lib/positive_cases.dart
+  11:34  warning  Probable user-visible hardcoded string in Text(data: ...). ('Settings')
+  14:16  warning  Probable user-visible hardcoded string in Text(data: ...). ('Hello')
+
+lib/profile_page.dart
+  9:34  warning  Probable user-visible hardcoded string in Text(data: ...). ('Profile')
+
+Summary
+  Files scanned: 6
+  Issues: 14
+  Warnings: 14
+  Errors: 0
+```
+
+See the complete runnable example in
+[`examples/flutter_localization`](examples/flutter_localization).
+
+---
+
+DevAudit's core is a small, language-agnostic engine...
 
 Built by **Pharos Labs**.
 
