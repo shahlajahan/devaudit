@@ -7,6 +7,7 @@ library;
 import 'dart:io';
 
 import 'package:args/command_runner.dart';
+import 'package:path/path.dart' as p;
 
 import '../core/engine/audit_engine.dart';
 import '../core/model/audit_context.dart';
@@ -176,14 +177,45 @@ class ScanCommand extends Command<int> {
       }
     }
 
-    final AuditReporter reporter = format == 'json'
-        ? const JsonReporter()
-        : const ConsoleReporter();
     // Only the rendered report is filtered; --fail-on below always
     // evaluates the original, unfiltered result, so hiding issues from the
     // report never changes CI behavior.
     final renderedResult = result.filteredBySeverity(minSeverity);
-    final rendered = reporter.render(renderedResult, target: targetArg);
+    final reportDir = Directory(args.option('report-dir')!);
+
+    // The bundle is written before the primary report, so that a compact
+    // "Report directory: ..." summary is only ever shown once that
+    // directory has actually been written successfully — not before a
+    // failure that would otherwise leave it looking misleading.
+    if (report) {
+      final exitCode = _writeReportBundle(
+        renderedResult,
+        target: targetArg,
+        reportDir: reportDir,
+        includeFolders: reportFolders,
+        includeAgentTasks: agentTasks,
+        verbose: verbose,
+      );
+      if (exitCode != null) return exitCode;
+    }
+
+    // With --report, the console format switches to a compact summary:
+    // every finding already lives in the report bundle, and printing all
+    // of them again is unusable on large projects. --format=json is
+    // unaffected either way.
+    final String rendered;
+    if (report && format == 'console') {
+      rendered = _renderCompactSummary(
+        renderedResult,
+        reportDir: reportDir,
+        includeAgentTasks: agentTasks,
+      );
+    } else {
+      final AuditReporter reporter = format == 'json'
+          ? const JsonReporter()
+          : const ConsoleReporter();
+      rendered = reporter.render(renderedResult, target: targetArg);
+    }
 
     if (outputPath != null) {
       try {
@@ -199,19 +231,45 @@ class ScanCommand extends Command<int> {
       if (!rendered.endsWith('\n')) stdout.writeln();
     }
 
-    if (report) {
-      final exitCode = _writeReportBundle(
-        renderedResult,
-        target: targetArg,
-        reportDir: Directory(args.option('report-dir')!),
-        includeFolders: reportFolders,
-        includeAgentTasks: agentTasks,
-        verbose: verbose,
-      );
-      if (exitCode != null) return exitCode;
+    return _exitCodeFor(result, failOn);
+  }
+
+  /// Renders the compact summary shown instead of the full console report
+  /// when `--report` is set: every finding already lives in the report
+  /// bundle at [reportDir], so there is no reason to print them all again.
+  ///
+  /// Points at the most useful entry points to open first —
+  /// `summary.md`/`summary.json`, and the agent task bundle when
+  /// [includeAgentTasks] is set — rather than just naming the directory
+  /// and leaving the user to explore it themselves.
+  String _renderCompactSummary(
+    AuditResult result, {
+    required Directory reportDir,
+    required bool includeAgentTasks,
+  }) {
+    final buffer = StringBuffer()
+      ..writeln('DevAudit')
+      ..writeln()
+      ..writeln('Summary')
+      ..writeln('  Files scanned: ${result.filesScanned}')
+      ..writeln('  Issues: ${result.issues.length}')
+      ..writeln('  Warnings: ${result.warningCount}')
+      ..writeln('  Errors: ${result.errorCount}')
+      ..writeln('  Duration: ${result.duration.inMilliseconds} ms')
+      ..writeln()
+      ..writeln('Reports written to:')
+      ..writeln()
+      ..writeln('  ${p.join(reportDir.path, 'summary.md')}')
+      ..writeln('  ${p.join(reportDir.path, 'summary.json')}');
+
+    if (includeAgentTasks) {
+      buffer
+        ..writeln()
+        ..writeln('AI agent bundle:')
+        ..writeln('  ${p.join(reportDir.path, 'agent')}/');
     }
 
-    return _exitCodeFor(result, failOn);
+    return buffer.toString();
   }
 
   int _exitCodeFor(AuditResult result, String failOn) {

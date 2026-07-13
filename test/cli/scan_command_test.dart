@@ -304,6 +304,110 @@ void main() {
       },
     );
 
+    test(
+      'the console report becomes a compact summary, not every finding',
+      () async {
+        final reportDir = p.join(tempDir.path, 'out');
+        final outputPath = p.join(tempDir.path, 'console.txt');
+        final exitCode = await DevAuditCommandRunner().run([
+          'scan',
+          _fixtureRoot,
+          '--report',
+          '--report-dir=$reportDir',
+          '--fail-on=none',
+          '--output=$outputPath',
+        ]);
+
+        expect(exitCode, 0);
+        final content = File(outputPath).readAsStringSync();
+
+        expect(content, contains('Files scanned: 6'));
+        expect(content, contains('Issues: 14'));
+        expect(content, contains('Warnings: 14'));
+        expect(content, contains('Errors: 0'));
+        expect(content, contains('Duration:'));
+
+        // Points at the useful entry points, not just the bare directory.
+        expect(content, contains('Reports written to:'));
+        expect(content, contains(p.join(reportDir, 'summary.md')));
+        expect(content, contains(p.join(reportDir, 'summary.json')));
+
+        // No agent bundle was requested, so it must not be mentioned.
+        expect(content, isNot(contains('AI agent bundle:')));
+
+        // No per-finding detail: neither a per-file header nor a specific
+        // finding's evidence/rule ID should appear.
+        expect(content, isNot(contains('lib/positive_cases.dart')));
+        expect(content, isNot(contains("'Settings'")));
+        expect(
+          content,
+          isNot(contains('flutter.localization.hardcoded-ui-string')),
+        );
+      },
+    );
+
+    test(
+      'the compact summary additionally points at the agent bundle when --agent-tasks is set',
+      () async {
+        final reportDir = p.join(tempDir.path, 'out');
+        final outputPath = p.join(tempDir.path, 'console.txt');
+        await DevAuditCommandRunner().run([
+          'scan',
+          _fixtureRoot,
+          '--report',
+          '--agent-tasks',
+          '--report-dir=$reportDir',
+          '--fail-on=none',
+          '--output=$outputPath',
+        ]);
+        final content = File(outputPath).readAsStringSync();
+
+        expect(content, contains('AI agent bundle:'));
+        expect(content, contains('${p.join(reportDir, 'agent')}/'));
+      },
+    );
+
+    test(
+      'without --report, the console report is unchanged (every finding is printed)',
+      () async {
+        final outputPath = p.join(tempDir.path, 'console.txt');
+        await DevAuditCommandRunner().run([
+          'scan',
+          _fixtureRoot,
+          '--fail-on=none',
+          '--output=$outputPath',
+        ]);
+        final content = File(outputPath).readAsStringSync();
+
+        expect(content, contains('lib/positive_cases.dart'));
+        expect(content, contains("'Settings'"));
+        expect(content, contains('flutter.localization.hardcoded-ui-string'));
+      },
+    );
+
+    test(
+      '--format=json is unaffected by --report: full issues are still emitted',
+      () async {
+        final reportDir = p.join(tempDir.path, 'out');
+        final outputPath = p.join(tempDir.path, 'report.json');
+        await DevAuditCommandRunner().run([
+          'scan',
+          _fixtureRoot,
+          '--report',
+          '--report-dir=$reportDir',
+          '--format=json',
+          '--fail-on=none',
+          '--output=$outputPath',
+        ]);
+        final decoded =
+            jsonDecode(File(outputPath).readAsStringSync())
+                as Map<String, Object?>;
+
+        expect(decoded['issueCount'], 14);
+        expect((decoded['issues'] as List), hasLength(14));
+      },
+    );
+
     test('--report-folders additionally writes folders/**', () async {
       final reportDir = p.join(tempDir.path, 'out');
       await DevAuditCommandRunner().run([
