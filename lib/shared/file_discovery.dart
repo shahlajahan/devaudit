@@ -6,6 +6,11 @@ library;
 
 import 'dart:io';
 
+/// Directory names every built-in file discovery helper skips, regardless
+/// of language or plugin: version control metadata and common build/tool
+/// output that never contains source a plugin should analyze.
+const excludedDirectoryNames = {'.dart_tool', 'build', '.git'};
+
 /// Recursively discovers files under [root], letting [isIncluded] decide
 /// whether to descend into a directory or yield a file.
 ///

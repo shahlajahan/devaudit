@@ -11,13 +11,15 @@ void main() {
       expect(plugin.displayName, 'Flutter');
       expect(plugin.rules.map((rule) => rule.id), [
         'flutter.localization.hardcoded-ui-string',
+        'flutter.localization.missing-locale-key',
       ]);
     });
 
-    test('supports only Dart files', () {
+    test('supports Dart and ARB files', () {
       const plugin = FlutterAuditPlugin();
       expect(plugin.supports('lib/main.dart'), isTrue);
       expect(plugin.supports('lib/main.g.dart'), isTrue);
+      expect(plugin.supports('lib/l10n/app_en.arb'), isTrue);
       expect(plugin.supports('README.md'), isFalse);
     });
 
@@ -75,6 +77,99 @@ void main() {
       );
       // The broken file is still counted as scanned; it just contributes no issues.
       expect(result.filesScanned, greaterThan(0));
+    });
+  });
+
+  group('FlutterAuditPlugin missing-locale-key rule', () {
+    const ruleId = 'flutter.localization.missing-locale-key';
+
+    test('reports nothing for identical ARBs', () async {
+      const plugin = FlutterAuditPlugin();
+      final result = await plugin.analyze(
+        const AuditContext(
+          projectRoot: 'test/fixtures/arb_localization/identical',
+        ),
+      );
+
+      expect(result.issues.where((issue) => issue.ruleId == ruleId), isEmpty);
+    });
+
+    test(
+      'reports missing keys across multiple locale files, ignoring metadata',
+      () async {
+        const plugin = FlutterAuditPlugin();
+        final result = await plugin.analyze(
+          const AuditContext(
+            projectRoot: 'test/fixtures/arb_localization/missing_keys',
+          ),
+        );
+
+        final issues = result.issues
+            .where((issue) => issue.ruleId == ruleId)
+            .toList();
+
+        // app_de.arb has every key app_en.arb defines: nothing missing.
+        expect(issues.any((issue) => issue.filePath == 'app_de.arb'), isFalse);
+
+        // app_tr.arb is missing "save" and "cancel", but never "@@locale",
+        // "@welcome", or "@save" (metadata is never a localization key).
+        final trIssues = issues
+            .where((issue) => issue.filePath == 'app_tr.arb')
+            .toList();
+        expect(trIssues.map((issue) => issue.evidence), ['cancel', 'save']);
+        expect(
+          trIssues.every((issue) => issue.severity == AuditSeverity.warning),
+          isTrue,
+        );
+        expect(
+          trIssues.any((issue) => (issue.evidence ?? '').startsWith('@')),
+          isFalse,
+        );
+      },
+    );
+
+    test(
+      'falls back to the first discovered ARB file when app_en.arb is absent',
+      () async {
+        const plugin = FlutterAuditPlugin();
+        final result = await plugin.analyze(
+          const AuditContext(
+            projectRoot: 'test/fixtures/arb_localization/no_reference_en',
+          ),
+        );
+
+        final issues = result.issues
+            .where((issue) => issue.ruleId == ruleId)
+            .toList();
+
+        // app_de.arb sorts before app_fr.arb and becomes the reference; only
+        // app_fr.arb (missing "save") is reported against.
+        expect(issues, hasLength(1));
+        expect(issues.single.filePath, 'app_fr.arb');
+        expect(issues.single.evidence, 'save');
+      },
+    );
+
+    test('reports nothing for empty ARB files', () async {
+      const plugin = FlutterAuditPlugin();
+      final result = await plugin.analyze(
+        const AuditContext(projectRoot: 'test/fixtures/arb_localization/empty'),
+      );
+
+      expect(result.issues.where((issue) => issue.ruleId == ruleId), isEmpty);
+    });
+
+    test('skips a malformed ARB file instead of crashing the scan', () async {
+      const plugin = FlutterAuditPlugin();
+      final result = await plugin.analyze(
+        const AuditContext(
+          projectRoot: 'test/fixtures/arb_localization/malformed',
+        ),
+      );
+
+      // Fewer than two valid ARB documents remain once app_tr.arb is
+      // discarded as malformed, so no comparison is possible or attempted.
+      expect(result.issues.where((issue) => issue.ruleId == ruleId), isEmpty);
     });
   });
 }

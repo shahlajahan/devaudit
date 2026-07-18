@@ -10,8 +10,6 @@ import 'package:path/path.dart' as p;
 
 import '../../shared/file_discovery.dart';
 
-const _excludedDirectoryNames = {'.dart_tool', 'build', '.git'};
-
 const _generatedFileSuffixes = [
   '.g.dart',
   '.freezed.dart',
@@ -93,7 +91,7 @@ class FlutterFileDiscovery {
   ) {
     if (type == FileSystemEntityType.directory) {
       final name = p.basename(path);
-      return !_excludedDirectoryNames.contains(name);
+      return !excludedDirectoryNames.contains(name);
     }
 
     if (!path.endsWith('.dart')) return false;

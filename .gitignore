@@ -7,6 +7,11 @@
 !test/fixtures/flutter_localization/lib/.dart_tool/
 !test/fixtures/flutter_localization/lib/.dart_tool/**
 
+# Fixture used by ArbFileDiscovery tests to verify that a real .dart_tool/
+# directory is pruned; it must stay tracked despite the blanket rule above.
+!test/fixtures/arb_localization/discovery/.dart_tool/
+!test/fixtures/arb_localization/discovery/.dart_tool/**
+
 # Default output of `devaudit scan --report` when run from the repo root.
 /devaudit-report/
 

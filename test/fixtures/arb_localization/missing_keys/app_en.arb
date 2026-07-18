@@ -1,0 +1,12 @@
+{
+  "@@locale": "en",
+  "welcome": "Welcome",
+  "@welcome": {
+    "description": "Greeting shown on the home page."
+  },
+  "save": "Save",
+  "@save": {
+    "description": "Label for the save button."
+  },
+  "cancel": "Cancel"
+}
